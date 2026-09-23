@@ -1,20 +1,36 @@
 // api/rc.js
 // Private proxy for FireAPI RC Vehicle Info
 // Keeps the real API key hidden on the server side.
+// Developed by @its_aritra_nath
 
 const FIREAPI_URL = "https://api.fireapi.io/secure-app/rc-vehicle-info/v1";
 
-// Optional simple protection: set PROXY_SECRET in Vercel env vars.
-// If set, callers must include ?key=YOUR_SECRET or header x-proxy-key.
-const PROXY_SECRET = process.env.PROXY_SECRET || "";
+// Developer credit (shown in every JSON response)
+const DEVELOPER = {
+  name: "Aritra Nath",
+  instagram: "@its_aritra_nath",
+  credit: "API developed by @its_aritra_nath",
+};
+
+// Private API key (hardcoded, required from browser or any client)
+const PRIVATE_KEY = "aritra";
 
 // CORS + JSON helper
 function send(res, status, body) {
   res.setHeader("Content-Type", "application/json; charset=utf-8");
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-proxy-key");
-  res.status(status).send(JSON.stringify(body, null, 2));
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, x-api-key");
+  res.status(status).send(
+    JSON.stringify(
+      {
+        developer: DEVELOPER,
+        ...body,
+      },
+      null,
+      2
+    )
+  );
 }
 
 export default async function handler(req, res) {
@@ -29,23 +45,25 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Optional secret check
-  if (PROXY_SECRET) {
-    const provided =
-      req.query.key ||
-      req.headers["x-proxy-key"] ||
-      "";
-    if (provided !== PROXY_SECRET) {
-      send(res, 401, {
-        success: false,
-        error: "Unauthorized",
-        message: "Missing or invalid proxy key.",
-      });
-      return;
-    }
+  // ---- Private key check (accessible from browser) ----
+  // Accept ?key=aritra OR header x-api-key: aritra
+  const providedKey =
+    (req.query.key && String(req.query.key).trim()) ||
+    (req.headers["x-api-key"] && String(req.headers["x-api-key"]).trim()) ||
+    "";
+
+  if (providedKey !== PRIVATE_KEY) {
+    send(res, 401, {
+      success: false,
+      error: "Unauthorized",
+      message: "Missing or invalid API key.",
+      hint: "Pass your key as ?key=YOUR_KEY or header x-api-key: YOUR_KEY",
+      credit: DEVELOPER.credit,
+    });
+    return;
   }
 
-  // Get vehicle number
+  // ---- Get vehicle number ----
   const vehicle_no = (req.query.vehicle_no || "").trim().toUpperCase();
 
   if (!vehicle_no) {
@@ -53,7 +71,7 @@ export default async function handler(req, res) {
       success: false,
       error: "Bad request",
       message: "Missing query parameter: vehicle_no",
-      example: "/api/rc?vehicle_no=WB26D2797",
+      example: "/api/rc?key=aritra&vehicle_no=WB26D2797",
     });
     return;
   }
